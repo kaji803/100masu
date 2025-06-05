@@ -164,10 +164,10 @@
     correctCount = 0;
     timeLeft = 180;
     clearInterval(timer);
-    startGame();
+    startGame(true); // 初期化ありで開始
   }
 
-  function startGame() {
+  function startGame(reset = false) {
     if (mode === "sub") {
       colHeaders = shuffle([...Array(10).keys()].map(n => n + 10));
       rowHeaders = shuffle([...Array(10).keys()]);
@@ -178,12 +178,18 @@
 
     buildGrid();
     currentInputIndex = 0;
-    correctCount = 0;
-    timeLeft = 180;
+
+    if (reset) {
+      correctCount = 0;
+      timeLeft = 180;
+    }
+
     timerEl.textContent = `残り時間: ${timeLeft} 秒`;
-    scoreEl.textContent = `正解数: 0`;
+    scoreEl.textContent = `正解数: ${correctCount}`;
     pageEl.textContent = `ページ: ${currentPage} / ${totalPages}`;
     drawChart();
+    enableAllCells();
+    updateCurrentCellDisplay();
   }
 
   function buildGrid() {
@@ -205,7 +211,7 @@
           div.className = "cell";
           div.dataset.row = i - 1;
           div.dataset.col = j - 1;
-          div.dataset.enabled = "false";
+          div.dataset.enabled = "true";
           div.onclick = () => {
             if (div.dataset.enabled !== "true") return;
             currentInputIndex = cells.indexOf(div);
@@ -217,7 +223,6 @@
         grid.appendChild(div);
       }
     }
-    updateCurrentCellDisplay();
   }
 
   function updateCurrentCellDisplay() {
@@ -260,7 +265,7 @@
       if (currentPage < totalPages) {
         currentPage++;
         pageEl.textContent = `ページ: ${currentPage} / ${totalPages}`;
-        startGame();
+        startGame(false); // タイマー・スコアをリセットしない
       } else {
         finishGame();
       }
@@ -280,9 +285,16 @@
   }
 
   function finishGame() {
-    saveResult();
-    drawChart();
-  }
+  // 入力を無効化（すべてのセルに対して）
+  const allCells = document.querySelectorAll('.cell');
+  allCells.forEach(cell => {
+    cell.dataset.enabled = 'false';
+    cell.classList.remove('selected');
+  });
+
+  saveResult();
+  drawChart();
+}
 
   function saveResult() {
     const key = `records_${mode}`;
@@ -379,8 +391,9 @@
   });
 
   createKeypad();
-  startGame();
+  startGame(true); // 初期化ありで初回スタート
 </script>
+
 
 </body>
 </html>
