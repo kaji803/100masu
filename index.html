@@ -33,32 +33,33 @@
       padding: 10px;
     }
     .grid-container {
-      display: grid;
-      grid-template-columns: repeat(11, 50px);
-      grid-template-rows: repeat(11, 50px);
-      gap: 2px;
-      margin-right: 20px;
-      margin-bottom: 10px;
-    }
-    .grid-container .label {
-      background-color: #e0f0ff;
-      font-weight: bold;
-      font-size: 24px;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      border: 1px solid #ccc;
-    }
-    .grid-container .cell {
-      width: 48px;
-      height: 48px;
-      font-size: 20px;
-      text-align: center;
-      line-height: 48px;
-      border: 1px solid #ccc;
-      background-color: white;
-      user-select: none;
-    }
+  display: grid;
+  grid-template-columns: repeat(11, 60px); /* 50px → 60px */
+  grid-template-rows: repeat(11, 60px);    /* 50px → 60px */
+  gap: 2px;
+  margin-right: 20px;
+  margin-bottom: 10px;
+}
+.grid-container .label {
+  background-color: #e0f0ff;
+  font-weight: bold;
+  font-size: 28.8px; /* 元: 24px × 1.2 */
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  border: 1px solid #ccc;
+}
+.grid-container .cell {
+  width: 58px;        /* 48px → 58px */
+  height: 58px;       /* 48px → 58px */
+  font-size: 24px;    /* 元: 20px × 1.2 */
+  text-align: center;
+  line-height: 58px;
+  border: 1px solid #ccc;
+  background-color: white;
+  user-select: none;
+}
+
     .keypad {
       display: grid;
       grid-template-columns: repeat(3, 100px);
@@ -84,6 +85,13 @@
       width: 100%;
       padding: 10px;
     }
+    .cell[data-enabled="false"],
+.cell.disabled {
+  background-color: #ccc;
+  color: #666;
+  pointer-events: none;
+}
+
     canvas {
       max-width: 100%;
       height: 550px !important;
@@ -125,17 +133,20 @@
 </div>
 
   <div class="container">
-    <div id="grid" class="grid-container"></div>
-    <div>
-      <div class="keypad" id="keypad"></div>
-    </div>
+  <div id="grid" class="grid-container"></div>
+  <div>
+    <!-- 残り時間の表示をここへ移動 -->
+    <div id="timer" style="font-size: 24px; margin-bottom: 10px;">残り時間: 180 秒</div>
+    <div class="keypad" id="keypad"></div>
+    <!-- 正解数をタッチパネルの下に表示 -->
+    <p id="score" style="font-size: 24px; margin-top: 10px;">正解数: 0</p>
   </div>
-  <div class="stats">
-    <p id="timer">残り時間: 180 秒</p>
-    <p id="page">ページ: 1 / 5</p>
-    <p id="score">正解数: 0</p>
-    <canvas id="chart"></canvas>
-  </div>
+</div>
+<!-- stats 内から score を削除 -->
+<div class="stats">
+  <p id="page">ページ: 1 / 5</p>
+  <canvas id="chart"></canvas>
+</div>
 
 <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 <script>
@@ -153,6 +164,7 @@
   let colHeaders = shuffle([...Array(10).keys()]);
   let currentInputIndex = 0, correctCount = 0;
   let cells = [], currentAnswer = "";
+  let gameStarted = false; // 追加：ゲームがスタートしたかどうか
 
   function shuffle(array) {
     return array.sort(() => Math.random() - 0.5);
@@ -164,7 +176,7 @@
     correctCount = 0;
     timeLeft = 180;
     clearInterval(timer);
-    startGame(true); // 初期化ありで開始
+    startGame(true);
   }
 
   function startGame(reset = false) {
@@ -188,9 +200,11 @@
     scoreEl.textContent = `正解数: ${correctCount}`;
     pageEl.textContent = `ページ: ${currentPage} / ${totalPages}`;
     drawChart();
-    enableAllCells();
     updateCurrentCellDisplay();
+    if (gameStarted) {
+    enableAllCells(); // ← ゲーム開始後のみ有効化
   }
+}
 
   function buildGrid() {
     grid.innerHTML = "";
@@ -211,7 +225,8 @@
           div.className = "cell";
           div.dataset.row = i - 1;
           div.dataset.col = j - 1;
-          div.dataset.enabled = "true";
+          div.dataset.enabled = "false"; // 初期状態は無効
+          div.classList.add("disabled"); // グレー表示
           div.onclick = () => {
             if (div.dataset.enabled !== "true") return;
             currentInputIndex = cells.indexOf(div);
@@ -226,13 +241,13 @@
   }
 
   function updateCurrentCellDisplay() {
-    cells.forEach(cell => cell.classList.remove("selected"));
-    const cell = cells[currentInputIndex];
-    if (cell) {
-      cell.classList.add("selected");
-      cell.textContent = currentAnswer;
-    }
+  cells.forEach(cell => cell.classList.remove("selected"));
+  const cell = cells[currentInputIndex];
+  if (cell && cell.dataset.enabled === "true") {
+    cell.classList.add("selected");
+    cell.textContent = currentAnswer;
   }
+}
 
   function startTimer() {
     timer = setInterval(() => {
@@ -265,7 +280,7 @@
       if (currentPage < totalPages) {
         currentPage++;
         pageEl.textContent = `ページ: ${currentPage} / ${totalPages}`;
-        startGame(false); // タイマー・スコアをリセットしない
+        startGame(false); // タイマー・スコアはそのまま
       } else {
         finishGame();
       }
@@ -273,28 +288,57 @@
   }
 
   function checkAndMoveIfCorrect() {
-    const cell = cells[currentInputIndex];
-    const row = rowHeaders[cell.dataset.row];
-    const col = colHeaders[cell.dataset.col];
-    let answer = mode === "add" ? row + col : mode === "sub" ? col - row : row * col;
-    if ((answer < 10 && currentAnswer.length === 1) || (answer >= 10 && currentAnswer.length === 2)) {
-      if (parseInt(currentAnswer) === answer) {
-        nextInput();
-      }
+  const cell = cells[currentInputIndex];
+  const row = rowHeaders[cell.dataset.row];
+  const col = colHeaders[cell.dataset.col];
+  let answer = mode === "add" ? row + col : mode === "sub" ? col - row : row * col;
+  
+  const expectedLength = answer < 10 ? 1 : 2;
+
+  if (currentAnswer.length === expectedLength) {
+    if (parseInt(currentAnswer) === answer) {
+      nextInput();
+    } else {
+      currentAnswer = "";  // 不正解でも入力をリセット
+      updateCurrentCellDisplay();
     }
   }
+}
+
+
+  function handleInput(char) {
+  if (currentAnswer.length >= 2) return;
+
+  currentAnswer += char;
+  updateCurrentCellDisplay();
+
+  const cell = cells[currentInputIndex];
+  const row = rowHeaders[cell.dataset.row];
+  const col = colHeaders[cell.dataset.col];
+  let answer = mode === "add" ? row + col : mode === "sub" ? col - row : row * col;
+
+  if (parseInt(currentAnswer) === answer) {
+    nextInput();
+  } else if (currentAnswer.length === 2 && parseInt(currentAnswer) !== answer) {
+    // 2桁目で間違っていた場合は、currentAnswerをクリアしてstay
+    currentAnswer = "";
+    updateCurrentCellDisplay();
+  }
+}
+
 
   function finishGame() {
-  // 入力を無効化（すべてのセルに対して）
-  const allCells = document.querySelectorAll('.cell');
-  allCells.forEach(cell => {
-    cell.dataset.enabled = 'false';
-    cell.classList.remove('selected');
-  });
+    gameStarted = false; // 追加：以降の入力不可にする
+    const allCells = document.querySelectorAll('.cell');
+    allCells.forEach(cell => {
+      cell.dataset.enabled = 'false';
+      cell.classList.remove('selected');
+      cell.classList.add('disabled');
+    });
 
-  saveResult();
-  drawChart();
-}
+    saveResult();
+    drawChart();
+  }
 
   function saveResult() {
     const key = `records_${mode}`;
@@ -340,59 +384,61 @@
   }
 
   document.addEventListener("keydown", (e) => {
-    const cell = cells[currentInputIndex];
-    if (!cell || cell.dataset.enabled !== "true") return;
+  const cell = cells[currentInputIndex];
+  if (!cell || cell.dataset.enabled !== "true") return;
 
-    if (e.key >= "0" && e.key <= "9") {
-      currentAnswer += e.key;
-      updateCurrentCellDisplay();
-      checkAndMoveIfCorrect();
-    } else if (e.key === "Backspace") {
-      currentAnswer = currentAnswer.slice(0, -1);
-      updateCurrentCellDisplay();
-    } else if (e.key === "Enter") {
-      nextInput();
-    }
-  });
+  if (e.key >= "0" && e.key <= "9") {
+    handleInput(e.key); // ここを変更
+  } else if (e.key === "Backspace") {
+    currentAnswer = currentAnswer.slice(0, -1);
+    updateCurrentCellDisplay();
+  } else if (e.key === "Enter") {
+    nextInput();
+  }
+});
+
 
   keypad.addEventListener("click", (e) => {
-    const cell = cells[currentInputIndex];
-    if (!cell || cell.dataset.enabled !== "true") return;
+  const cell = cells[currentInputIndex];
+  if (!cell || cell.dataset.enabled !== "true") return;
 
-    const key = e.target.dataset.key;
-    if (!key) return;
+  const key = e.target.dataset.key;
+  if (!key) return;
 
-    if (key === "⌫") {
-      currentAnswer = currentAnswer.slice(0, -1);
-      updateCurrentCellDisplay();
-    } else if (key === "Enter") {
-      nextInput();
-    } else {
-      if (currentAnswer.length < 2) {
-        currentAnswer += key;
-        updateCurrentCellDisplay();
-        checkAndMoveIfCorrect();
-      }
-    }
-  });
+  if (key === "⌫") {
+    currentAnswer = currentAnswer.slice(0, -1);
+    updateCurrentCellDisplay();
+  } else if (key === "Enter") {
+    nextInput();
+  } else {
+    handleInput(key); // ここを変更
+  }
+});
+
 
   function enableAllCells() {
-    const cells = document.querySelectorAll('.cell');
-    cells.forEach(cell => {
+    const allCells = document.querySelectorAll('.cell');
+    allCells.forEach(cell => {
       cell.dataset.enabled = 'true';
+      cell.classList.remove('disabled'); // グレー解除
     });
   }
 
   document.getElementById('start-button').addEventListener('click', () => {
-    startTimer();
-    document.getElementById('start-container').style.display = 'none';
-    enableAllCells();
-    updateCurrentCellDisplay();
-  });
+  gameStarted = true; // 追加
+  startTimer();
+  document.getElementById('start-container').style.display = 'none';
+  enableAllCells(); // スタート時に有効化
+  updateCurrentCellDisplay();
+});
+
+
 
   createKeypad();
-  startGame(true); // 初期化ありで初回スタート
+  startGame(true); // 初回はリセットありで準備のみ（入力はスタートボタン後）
 </script>
+
+
 
 
 </body>
