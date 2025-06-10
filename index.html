@@ -315,14 +315,30 @@
   const cell = cells[currentInputIndex];
   const row = rowHeaders[cell.dataset.row];
   const col = colHeaders[cell.dataset.col];
-  let answer = mode === "add" ? row + col : mode === "sub" ? col - row : row * col;
+  const answer = mode === "add" ? row + col : mode === "sub" ? col - row : row * col;
 
-  if (parseInt(currentAnswer) === answer) {
+  const isCorrect = parseInt(currentAnswer) === answer;
+
+  if (isCorrect) {
     nextInput();
-  } else if (currentAnswer.length === 2 && parseInt(currentAnswer) !== answer) {
-    // 2桁目で間違っていた場合は、currentAnswerをクリアしてstay
-    currentAnswer = "";
-    updateCurrentCellDisplay();
+  } else {
+    // 入力が正解でない場合の処理
+    const wrongInput = currentAnswer;
+
+    // 条件①③：正解が1桁のとき、1桁または2桁の間違いをすぐに消す
+    // 条件②：すべての間違いは0.1秒表示してから消す
+    const correctLength = answer.toString().length;
+    if (
+      currentAnswer.length === correctLength || // 1桁正解→1桁不正解 / 2桁正解→2桁不正解
+      (correctLength === 1 && currentAnswer.length === 2) // 1桁正解→2桁不正解（③）
+    ) {
+      setTimeout(() => {
+        if (currentAnswer === wrongInput) {
+          currentAnswer = "";
+          updateCurrentCellDisplay();
+        }
+      }, 100); // 条件②：0.1秒で消す
+    }
   }
 }
 
@@ -438,6 +454,11 @@
   startGame(true); // 初回はリセットありで準備のみ（入力はスタートボタン後）
 </script>
 
+
+
+
+</body>
+</html>
 
 
 
